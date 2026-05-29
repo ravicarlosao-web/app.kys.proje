@@ -156,9 +156,9 @@ export default function HomeScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={[
             styles.lista,
-            { paddingBottom: insets.bottom + 100 },
+            { paddingBottom: insets.bottom + 110, flexGrow: 1 },
           ]}
-          scrollEnabled={medicamentos.length > 0}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={loading}
@@ -186,7 +186,7 @@ export default function HomeScreen() {
       <TouchableOpacity
         style={[
           styles.fab,
-          { backgroundColor: colors.primary, bottom: insets.bottom + 80 },
+          { backgroundColor: colors.primary, bottom: insets.bottom + 70 },
         ]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

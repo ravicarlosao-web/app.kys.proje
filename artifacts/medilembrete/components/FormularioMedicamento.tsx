@@ -4,7 +4,7 @@ import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
 import {
   Alert,
-  Platform,
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { KeyboardAwareScrollViewCompat } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { Medicamento, CategoriaMedicamento, DIAS_SEMANA } from "@/types";
@@ -149,14 +148,17 @@ export default function FormularioMedicamento({
     }
   };
 
-  const Scroll = Platform.OS === "web" ? ScrollView : KeyboardAwareScrollViewCompat;
+  const { width } = Dimensions.get("window");
+  const numColunasCategorias = width < 360 ? 2 : 3;
+  const larguraCategoria = (width - 40 - (numColunasCategorias - 1) * 10) / numColunasCategorias;
 
   return (
     <>
-      <Scroll
+      <ScrollView
         style={{ flex: 1, backgroundColor: colors.background }}
-        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 110 }]}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         {/* Nome */}
         <View style={styles.grupo}>
@@ -217,6 +219,7 @@ export default function FormularioMedicamento({
                   style={[
                     styles.categoriaItem,
                     {
+                      width: larguraCategoria,
                       backgroundColor: selecionada ? colors.primary + "15" : colors.card,
                       borderColor: selecionada ? colors.primary : colors.border,
                     },
@@ -464,7 +467,7 @@ export default function FormularioMedicamento({
             </Text>
           </TouchableOpacity>
         )}
-      </Scroll>
+      </ScrollView>
 
       {/* Botões de ação fixos */}
       <View
@@ -546,8 +549,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   categoriaItem: {
-    width: "30%",
-    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
