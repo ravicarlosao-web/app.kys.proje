@@ -1,5 +1,6 @@
-// Card de medicamento para a lista principal
+// Card de medicamento — design premium com animações
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import React from "react";
 import {
   StyleSheet,
@@ -7,6 +8,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import { useColors } from "@/hooks/useColors";
 import { Medicamento } from "@/types";
 import { CategoriaMedicamento } from "@/constants/colors";
@@ -16,24 +22,21 @@ interface Props {
   tomadoHoje: boolean;
   onPress: () => void;
   onMarcarTomado: () => void;
+  dosesTomadasHoje?: Set<string>;
 }
 
-// Ícone e label para cada categoria
-function getIconeCategoria(categoria: CategoriaMedicamento): {
-  icone: keyof typeof Ionicons.glyphMap;
-} {
-  const mapa: Record<string, { icone: keyof typeof Ionicons.glyphMap }> = {
-    comprimido: { icone: "medical" },
-    xarope: { icone: "water" },
-    injecao: { icone: "fitness" },
-    pomada: { icone: "bandage" },
-    colurio: { icone: "eye" },
-    inalador: { icone: "cloud" },
+function getIconeCategoria(categoria: CategoriaMedicamento): keyof typeof Ionicons.glyphMap {
+  const mapa: Record<string, keyof typeof Ionicons.glyphMap> = {
+    comprimido: "medical",
+    xarope: "water",
+    injecao: "fitness",
+    pomada: "bandage",
+    colurio: "eye",
+    inalador: "cloud",
   };
-  return mapa[categoria] ?? { icone: "medical" };
+  return mapa[categoria] ?? "medical";
 }
 
-// Próximo horário a tomar (o mais próximo do atual)
 function getProximoHorario(horarios: string[]): string {
   if (horarios.length === 0) return "";
   const agora = new Date();
@@ -43,7 +46,9 @@ function getProximoHorario(horarios: string[]): string {
   for (const h of horarios) {
     const [hStr, mStr] = h.split(":");
     const minutos = parseInt(hStr) * 60 + parseInt(mStr);
-    const diff = minutos >= minutosAgora ? minutos - minutosAgora : minutos + 24 * 60 - minutosAgora;
+    const diff = minutos >= minutosAgora
+      ? minutos - minutosAgora
+      : minutos + 24 * 60 - minutosAgora;
     if (diff < proxMinutos) {
       proxMinutos = diff;
       proxHorario = h;
@@ -52,92 +57,192 @@ function getProximoHorario(horarios: string[]): string {
   return proxHorario;
 }
 
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
 export default function MedicamentoCard({
   medicamento,
   tomadoHoje,
   onPress,
   onMarcarTomado,
+  dosesTomadasHoje,
 }: Props) {
   const colors = useColors();
-  const { icone } = getIconeCategoria(medicamento.categoria as CategoriaMedicamento);
+  const scale = useSharedValue(1);
+
+  const icone = getIconeCategoria(medicamento.categoria as CategoriaMedicamento);
   const proximoHorario = getProximoHorario(medicamento.horarios);
   const esgotado = medicamento.estoque !== null && medicamento.estoque === 0;
-  const stockBaixo = medicamento.estoque !== null && medicamento.estoque > 0 && medicamento.estoque < 5;
+  const stockBaixo = medicamento.estoque !== null && medicamento.estoque > 0 && medicamento.estoque <= 5;
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.97, { damping: 20, stiffness: 400 });
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 20, stiffness: 400 });
+  };
+
+  const handleMarcar = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onMarcarTomado();
+  };
+
+  // Verificar quais horários de hoje já foram tomados
+  const getStatusHorario = (h: string): "tomado" | "pendente" => {
+    if (!dosesTomadasHoje) return tomadoHoje ? "tomado" : "pendente";
+    return dosesTomadasHoje.has(`${medicamento.id}-${h}`) ? "tomado" : "pendente";
+  };
 
   return (
-    <TouchableOpacity
+    <AnimatedTouchable
       onPress={onPress}
-      activeOpacity={0.85}
-      style={[styles.card, { backgroundColor: colors.card }]}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}
+      style={[styles.card, { backgroundColor: colors.card }, animatedStyle]}
     >
-      {/* Barra colorida lateral */}
+      {/* Barra lateral de cor */}
       <View style={[styles.barraCor, { backgroundColor: medicamento.cor }]} />
 
-      {/* Ícone da categoria */}
-      <View
-        style={[
-          styles.iconeWrapper,
-          { backgroundColor: medicamento.cor + "20" },
-        ]}
-      >
-        <Ionicons name={icone} size={24} color={medicamento.cor} />
-      </View>
+      {/* Conteúdo principal */}
+      <View style={styles.corpo}>
+        {/* Topo: ícone + nome + botão tomado */}
+        <View style={styles.topo}>
+          <View style={[styles.iconeCircle, { backgroundColor: medicamento.cor + "18" }]}>
+            <Ionicons name={icone} size={22} color={medicamento.cor} />
+          </View>
 
-      {/* Informações principais */}
-      <View style={styles.info}>
-        <Text style={[styles.nome, { color: colors.text }]} numberOfLines={1}>
-          {medicamento.nome}
-        </Text>
-        <Text style={[styles.dosagem, { color: colors.textSecondary }]}>
-          {medicamento.dosagem}
-        </Text>
-        {esgotado ? (
-          <Text style={[styles.alerta, { color: colors.danger }]}>
-            Estoque esgotado
-          </Text>
-        ) : stockBaixo ? (
-          <Text style={[styles.alerta, { color: colors.warning }]}>
-            Stock baixo: {medicamento.estoque} restantes
-          </Text>
-        ) : proximoHorario ? (
-          <View style={styles.horarioRow}>
-            <Ionicons name="time-outline" size={13} color={colors.secondary} />
-            <Text style={[styles.horario, { color: colors.secondary }]}>
-              {" "}{proximoHorario}
+          <View style={styles.infoTexto}>
+            <Text style={[styles.nome, { color: colors.text }]} numberOfLines={1}>
+              {medicamento.nome}
+            </Text>
+            <Text style={[styles.dosagem, { color: colors.textSecondary }]}>
+              {medicamento.dosagem}
             </Text>
           </View>
-        ) : null}
+
+          {/* Botão marcar tomado */}
+          <TouchableOpacity
+            onPress={handleMarcar}
+            disabled={tomadoHoje}
+            activeOpacity={0.7}
+            style={[
+              styles.botaoTomado,
+              {
+                backgroundColor: tomadoHoje ? colors.success + "20" : colors.primary,
+                borderWidth: tomadoHoje ? 0 : 0,
+              },
+            ]}
+          >
+            <Ionicons
+              name={tomadoHoje ? "checkmark-circle" : "checkmark"}
+              size={tomadoHoje ? 20 : 16}
+              color={tomadoHoje ? colors.success : "#fff"}
+            />
+            {!tomadoHoje && (
+              <Text style={styles.botaoTomarTexto}>Tomar</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Horários do dia como chips */}
+        {medicamento.horarios.length > 0 && (
+          <View style={styles.horariosRow}>
+            {medicamento.horarios.slice(0, 4).map((h) => {
+              const status = getStatusHorario(h);
+              const ehProximo = h === proximoHorario && status === "pendente";
+              return (
+                <View
+                  key={h}
+                  style={[
+                    styles.horarioChip,
+                    {
+                      backgroundColor:
+                        status === "tomado"
+                          ? colors.success + "18"
+                          : ehProximo
+                          ? colors.primary + "18"
+                          : colors.muted,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={status === "tomado" ? "checkmark-circle" : "time-outline"}
+                    size={11}
+                    color={
+                      status === "tomado"
+                        ? colors.success
+                        : ehProximo
+                        ? colors.primary
+                        : colors.mutedForeground
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.horarioChipTexto,
+                      {
+                        color:
+                          status === "tomado"
+                            ? colors.success
+                            : ehProximo
+                            ? colors.primary
+                            : colors.mutedForeground,
+                        fontFamily: ehProximo ? "Poppins_600SemiBold" : "Poppins_400Regular",
+                      },
+                    ]}
+                  >
+                    {h}
+                  </Text>
+                </View>
+              );
+            })}
+            {medicamento.horarios.length > 4 && (
+              <Text style={[styles.maisHorarios, { color: colors.mutedForeground }]}>
+                +{medicamento.horarios.length - 4}
+              </Text>
+            )}
+          </View>
+        )}
+
+        {/* Alertas de stock */}
+        {(esgotado || stockBaixo) && (
+          <View
+            style={[
+              styles.stockAlerta,
+              { backgroundColor: esgotado ? colors.danger + "12" : colors.warning + "12" },
+            ]}
+          >
+            <Ionicons
+              name={esgotado ? "alert-circle" : "warning"}
+              size={13}
+              color={esgotado ? colors.danger : colors.warning}
+            />
+            <Text
+              style={[
+                styles.stockTexto,
+                { color: esgotado ? colors.danger : colors.warning },
+              ]}
+            >
+              {esgotado
+                ? "Stock esgotado — precisa de reabastecer"
+                : `Stock baixo: ${medicamento.estoque} dose${medicamento.estoque === 1 ? "" : "s"} restante${medicamento.estoque === 1 ? "" : "s"}`}
+            </Text>
+          </View>
+        )}
       </View>
 
-      {/* Botão de marcar como tomado + chevron */}
-      <View style={styles.acoes}>
-        <TouchableOpacity
-          onPress={onMarcarTomado}
-          disabled={tomadoHoje}
-          style={[
-            styles.botaoTomado,
-            {
-              backgroundColor: tomadoHoje
-                ? colors.muted
-                : colors.primary,
-            },
-          ]}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name={tomadoHoje ? "checkmark" : "checkmark-outline"}
-            size={16}
-            color={tomadoHoje ? colors.mutedForeground : "#fff"}
-          />
-        </TouchableOpacity>
-        <Ionicons
-          name="chevron-forward"
-          size={18}
-          color={colors.mutedForeground}
-          style={{ marginTop: 8 }}
-        />
-      </View>
-    </TouchableOpacity>
+      {/* Chevron */}
+      <Ionicons
+        name="chevron-forward"
+        size={16}
+        color={colors.border}
+        style={styles.chevron}
+      />
+    </AnimatedTouchable>
   );
 }
 
@@ -145,70 +250,103 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: 18,
     marginBottom: 12,
-    padding: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
     overflow: "hidden",
   },
   barraCor: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
     width: 5,
-    borderTopLeftRadius: 16,
-    borderBottomLeftRadius: 16,
+    alignSelf: "stretch",
+    borderTopLeftRadius: 18,
+    borderBottomLeftRadius: 18,
   },
-  iconeWrapper: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  corpo: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+  topo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  iconeCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 8,
-    marginRight: 12,
+    flexShrink: 0,
   },
-  info: {
+  infoTexto: {
     flex: 1,
     gap: 2,
   },
   nome: {
     fontSize: 16,
     fontFamily: "Poppins_600SemiBold",
+    lineHeight: 22,
   },
   dosagem: {
     fontSize: 13,
     fontFamily: "Poppins_400Regular",
   },
-  horarioRow: {
+  botaoTomado: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 2,
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    flexShrink: 0,
   },
-  horario: {
-    fontSize: 13,
-    fontFamily: "Poppins_500Medium",
-  },
-  alerta: {
+  botaoTomarTexto: {
+    color: "#fff",
     fontSize: 12,
-    fontFamily: "Poppins_500Medium",
-    marginTop: 2,
+    fontFamily: "Poppins_600SemiBold",
   },
-  acoes: {
+  horariosRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  horarioChip: {
+    flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  botaoTomado: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  horarioChipTexto: {
+    fontSize: 11,
+  },
+  maisHorarios: {
+    fontSize: 11,
+    fontFamily: "Poppins_500Medium",
+    alignSelf: "center",
+  },
+  stockAlerta: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  stockTexto: {
+    fontSize: 12,
+    fontFamily: "Poppins_500Medium",
+    flex: 1,
+  },
+  chevron: {
+    marginRight: 14,
+    flexShrink: 0,
   },
 });

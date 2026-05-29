@@ -2,16 +2,13 @@
 import { Platform } from "react-native";
 import { Medicamento } from "@/types";
 
-// Verifica se estamos numa plataforma que suporta notificações
 const suportaNotificacoes = Platform.OS !== "web";
 
-// Pede permissão ao utilizador para enviar notificações
 export async function requestPermissions(): Promise<boolean> {
   if (!suportaNotificacoes) return false;
   try {
     const Notifications = await import("expo-notifications");
-    const { status: existingStatus } =
-      await Notifications.getPermissionsAsync();
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
     if (existingStatus !== "granted") {
       const { status } = await Notifications.requestPermissionsAsync();
@@ -19,12 +16,11 @@ export async function requestPermissions(): Promise<boolean> {
     }
     return finalStatus === "granted";
   } catch (error) {
-    console.error("Erro ao pedir permissões de notificação:", error);
+    console.error("Erro ao pedir permissões:", error);
     return false;
   }
 }
 
-// Configura o handler de notificações (chamar no arranque do app)
 export async function configurarNotificacoes(): Promise<void> {
   if (!suportaNotificacoes) return;
   try {
@@ -43,10 +39,7 @@ export async function configurarNotificacoes(): Promise<void> {
   }
 }
 
-// Agenda notificações para um medicamento
-export async function scheduleNotification(
-  medicamento: Medicamento
-): Promise<string[]> {
+export async function scheduleNotification(medicamento: Medicamento): Promise<string[]> {
   if (!suportaNotificacoes) return [];
   try {
     const Notifications = await import("expo-notifications");
@@ -58,7 +51,6 @@ export async function scheduleNotification(
       const minuto = parseInt(minutoStr, 10);
 
       for (const diaSemana of medicamento.diasSemana) {
-        // expo-notifications: weekday 1=Domingo, 2=Segunda, ..., 7=Sábado
         const weekday = diaSemana + 1;
         try {
           const id = await Notifications.scheduleNotificationAsync({
@@ -77,7 +69,7 @@ export async function scheduleNotification(
           });
           ids.push(id);
         } catch {
-          // Continua com os outros horários mesmo se um falhar
+          // continua mesmo se um falhar
         }
       }
     }
@@ -88,7 +80,32 @@ export async function scheduleNotification(
   }
 }
 
-// Cancela todas as notificações de um medicamento
+// Envia alerta imediato quando o stock está baixo
+export async function notificarStockBaixo(medicamento: Medicamento): Promise<void> {
+  if (!suportaNotificacoes) return;
+  if (medicamento.estoque === null || medicamento.estoque > 5) return;
+
+  try {
+    const Notifications = await import("expo-notifications");
+    const qtd = medicamento.estoque;
+    const msg =
+      qtd === 0
+        ? `O stock de "${medicamento.nome}" esgotou! Trata de comprar mais.`
+        : `"${medicamento.nome}" tem apenas ${qtd} dose${qtd === 1 ? "" : "s"} restante${qtd === 1 ? "" : "s"}. Reabastece já!`;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: qtd === 0 ? "⛔ Stock esgotado!" : "⚠️ Stock quase a acabar!",
+        body: msg,
+        sound: true,
+      },
+      trigger: null, // imediato
+    });
+  } catch (error) {
+    console.error("Erro ao notificar stock baixo:", error);
+  }
+}
+
 export async function cancelNotifications(ids: string[]): Promise<void> {
   if (!suportaNotificacoes || ids.length === 0) return;
   try {
@@ -101,7 +118,6 @@ export async function cancelNotifications(ids: string[]): Promise<void> {
   }
 }
 
-// Cancela todas as notificações do app
 export async function cancelAllNotifications(): Promise<void> {
   if (!suportaNotificacoes) return;
   try {
@@ -112,7 +128,6 @@ export async function cancelAllNotifications(): Promise<void> {
   }
 }
 
-// Lista notificações agendadas (para debug)
 export async function listScheduledNotifications(): Promise<unknown[]> {
   if (!suportaNotificacoes) return [];
   try {

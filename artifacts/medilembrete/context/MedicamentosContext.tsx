@@ -18,9 +18,10 @@ import {
 } from "@/services/storageService";
 import {
   cancelNotifications,
+  configurarNotificacoes,
+  notificarStockBaixo,
   requestPermissions,
   scheduleNotification,
-  configurarNotificacoes,
 } from "@/services/notificationService";
 
 interface MedicamentosContextType {
@@ -56,7 +57,6 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
   }, []);
 
   useEffect(() => {
-    // Configurar notificações e pedir permissões no arranque
     configurarNotificacoes();
     requestPermissions().then(setTemPermissaoNotificacoes);
     carregarDados();
@@ -71,10 +71,13 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
       criadoEm: new Date().toISOString(),
       notificationIds: [],
     };
-    // Agendar notificações
     const notifIds = await scheduleNotification(novoMedicamento);
     novoMedicamento.notificationIds = notifIds;
     await saveMedicamento(novoMedicamento);
+    // Verifica stock imediatamente após adicionar
+    if (novoMedicamento.estoque !== null && novoMedicamento.estoque <= 5) {
+      await notificarStockBaixo(novoMedicamento);
+    }
     setMedicamentos((prev) => [...prev, novoMedicamento]);
   }, []);
 
@@ -82,12 +85,10 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
     id: string,
     dados: Omit<Medicamento, "id" | "criadoEm" | "notificationIds">
   ) => {
-    // Cancelar notificações antigas
     const medExistente = medicamentos.find((m) => m.id === id);
     if (medExistente?.notificationIds?.length) {
       await cancelNotifications(medExistente.notificationIds);
     }
-    // Agendar novas notificações
     const medAtualizado: Medicamento = {
       ...dados,
       id,
@@ -97,6 +98,10 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
     const notifIds = await scheduleNotification(medAtualizado);
     medAtualizado.notificationIds = notifIds;
     await updateMedicamento(id, medAtualizado);
+    // Verifica stock após edição
+    if (medAtualizado.estoque !== null && medAtualizado.estoque <= 5) {
+      await notificarStockBaixo(medAtualizado);
+    }
     setMedicamentos((prev) =>
       prev.map((m) => (m.id === id ? medAtualizado : m))
     );
@@ -117,6 +122,7 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
   ) => {
     const med = medicamentos.find((m) => m.id === medicamentoId);
     if (!med) return;
+
     const registo: RegistoHistorico = {
       id: gerarId(),
       medicamentoId,
@@ -127,6 +133,21 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
       status: "tomado",
     };
     await saveRegistoHistorico(registo);
+
+    // Decrementar stock se estiver definido
+    let novoStock = med.estoque;
+    if (novoStock !== null && novoStock > 0) {
+      novoStock = novoStock - 1;
+      await updateMedicamento(medicamentoId, { estoque: novoStock });
+      setMedicamentos((prev) =>
+        prev.map((m) => (m.id === medicamentoId ? { ...m, estoque: novoStock } : m))
+      );
+      // Alertar se stock ficou baixo
+      if (novoStock <= 5) {
+        await notificarStockBaixo({ ...med, estoque: novoStock });
+      }
+    }
+
     setHistorico((prev) => [registo, ...prev]);
   }, [medicamentos]);
 
