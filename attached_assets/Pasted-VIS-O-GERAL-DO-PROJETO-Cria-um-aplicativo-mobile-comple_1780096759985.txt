@@ -1,0 +1,472 @@
+VISÃO GERAL DO PROJETO
+Cria um aplicativo mobile completo chamado "MediLembrete" usando React Native com Expo. O app deve funcionar em Android e iOS, ser totalmente funcional offline, ter visual profissional de nível internacional, e permitir que o utilizador registe medicamentos com horários e receba notificações locais de lembrete.
+
+STACK TECNOLÓGICA OBRIGATÓRIA
+
+Framework: React Native com Expo (SDK mais recente)
+Linguagem: JavaScript (ou TypeScript se possível)
+Navegação: React Navigation v6 (Stack + Bottom Tab Navigator)
+Armazenamento local: AsyncStorage (@react-native-async-storage/async-storage)
+Notificações: expo-notifications
+Ícones: @expo/vector-icons (família Ionicons)
+Data e hora: date-fns (para formatação de datas)
+UUID: uuid ou nanoid (para gerar IDs únicos dos medicamentos)
+Fontes: expo-font com Google Fonts (usar fonte Poppins)
+
+
+IDENTIDADE VISUAL
+Paleta de Cores
+PRIMARY: #2D6A4F (verde escuro — saúde)
+SECONDARY: #52B788 (verde médio)
+ACCENT: #95D5B2 (verde claro)
+BACKGROUND: #F8FAF9 (branco esverdeado)
+CARD: #FFFFFF (branco puro)
+TEXT_PRIMARY: #1B1F1E (quase preto)
+TEXT_SECONDARY: #6B7280 (cinza)
+DANGER: #EF4444 (vermelho para alertas)
+WARNING: #F59E0B (amarelo/laranja)
+SUCCESS: #10B981 (verde sucesso)
+BORDER: #E5E7EB (cinza claro)
+Tipografia
+
+Fonte principal: Poppins (Regular, Medium, SemiBold, Bold)
+Títulos: Poppins Bold, tamanho 24–28px
+Subtítulos: Poppins SemiBold, tamanho 18–20px
+Corpo: Poppins Regular, tamanho 14–16px
+Labels pequenos: Poppins Medium, tamanho 12px
+
+Estilo Visual Geral
+
+Cantos arredondados (borderRadius: 16–20px nos cards)
+Sombras suaves nos cards (elevation: 4 no Android, shadow no iOS)
+Espaçamentos generosos (padding de 16–24px)
+Ícones grandes e claros
+Animações suaves nas transições
+
+
+ESTRUTURA DE PASTAS DO PROJETO
+MediLembrete/
+├── App.js
+├── app.json
+├── package.json
+├── assets/
+│   └── images/
+│       └── logo.png
+├── src/
+│   ├── navigation/
+│   │   └── AppNavigator.js
+│   ├── screens/
+│   │   ├── HomeScreen.js
+│   │   ├── AddMedicamentoScreen.js
+│   │   ├── EditMedicamentoScreen.js
+│   │   ├── DetalhesScreen.js
+│   │   └── HistoricoScreen.js
+│   ├── components/
+│   │   ├── MedicamentoCard.js
+│   │   ├── HorarioItem.js
+│   │   ├── EmptyState.js
+│   │   ├── Header.js
+│   │   └── ConfirmModal.js
+│   ├── services/
+│   │   ├── storageService.js
+│   │   └── notificationService.js
+│   ├── hooks/
+│   │   └── useMedicamentos.js
+│   └── constants/
+│       ├── colors.js
+│       └── fonts.js
+
+FUNCIONALIDADES COMPLETAS
+1. ECRÃ INICIAL — HomeScreen
+O que deve mostrar:
+
+Header com logo pequeno à esquerda e título "MediLembrete" ao centro
+Subtítulo: "Os teus medicamentos de hoje"
+Data de hoje formatada em português (ex: "Sexta, 30 de Maio de 2026")
+Resumo do dia em 3 cards horizontais no topo:
+
+Card 1: Total de medicamentos cadastrados
+Card 2: Doses tomadas hoje
+Card 3: Doses pendentes hoje
+
+
+Lista de medicamentos cadastrados, cada um como um card com:
+
+Ícone da categoria do medicamento (comprimido, xarope, injeção, etc.)
+Nome do medicamento em negrito
+Dosagem (ex: "500mg")
+Próximo horário de toma
+Indicador colorido de status (tomado/pendente)
+Botão de marcar como "tomado" diretamente no card
+
+
+Botão flutuante (FAB) no canto inferior direito com ícone "+" para adicionar novo medicamento
+Estado vazio: se não houver medicamentos, mostrar ilustração com texto "Nenhum medicamento cadastrado. Toca no + para adicionar."
+
+Interações:
+
+Toque no card → navega para DetalhesScreen
+Toque no FAB → navega para AddMedicamentoScreen
+Toque no botão "tomado" → marca dose como tomada e atualiza o estado visualmente com animação
+
+
+2. ECRÃ ADICIONAR MEDICAMENTO — AddMedicamentoScreen
+Campos do formulário:
+
+Nome do medicamento (obrigatório)
+
+TextInput com placeholder "Ex: Paracetamol"
+Validação: não pode estar vazio
+
+
+Dosagem (obrigatório)
+
+TextInput com placeholder "Ex: 500mg, 10ml, 1 comprimido"
+
+
+Categoria (obrigatório)
+
+Seleção visual em grid com ícones:
+
+💊 Comprimido
+🧴 Xarope
+💉 Injeção
+🩹 Pomada
+👁️ Colírio
+💨 Inalador
+
+
+O item selecionado fica com fundo verde e borda destacada
+
+
+Cor do medicamento (opcional)
+
+Paleta de 8 cores para identificar visualmente o medicamento na lista
+Cores: verde, azul, vermelho, laranja, roxo, rosa, amarelo, cinza
+
+
+Data de início (obrigatório)
+
+DatePicker nativo do Expo (expo-datetime-picker)
+Default: hoje
+
+
+Data de fim / Duração (opcional)
+
+Toggle switch: "Tem data de fim?"
+Se ativado, mostrar DatePicker para data de fim
+
+
+Horários de toma (obrigatório — mínimo 1)
+
+Botão "Adicionar horário" que abre TimePicker
+Lista dos horários já adicionados com botão de remover cada um
+Pode adicionar até 6 horários por dia
+Cada horário aparece como uma tag/chip removível
+
+
+Dias da semana (obrigatório)
+
+Seleção múltipla dos dias: Seg / Ter / Qua / Qui / Sex / Sáb / Dom
+Botão "Todos os dias" para selecionar todos de uma vez
+Dias selecionados ficam com fundo verde
+
+
+Instruções / Observações (opcional)
+
+TextInput multilinha
+Placeholder: "Ex: Tomar com água, após as refeições"
+
+
+Estoque (opcional)
+
+Campo numérico: quantidade atual de comprimidos/doses disponíveis
+Alertar quando estoque estiver baixo (menos de 5 unidades)
+
+
+
+Botões:
+
+"Guardar Medicamento" — botão verde grande na parte inferior
+"Cancelar" — botão secundário acima do guardar
+
+Validações:
+
+Se nome ou dosagem estiverem vazios → mostrar mensagem de erro abaixo do campo
+Se nenhum horário for adicionado → mostrar erro
+Se nenhum dia da semana for selecionado → mostrar erro
+
+Ao guardar:
+
+Gerar ID único com uuid/nanoid
+Salvar no AsyncStorage
+Agendar notificações locais para cada horário nos dias selecionados
+Navegar de volta para HomeScreen com mensagem de sucesso (Toast ou Snackbar)
+
+
+3. ECRÃ EDITAR MEDICAMENTO — EditMedicamentoScreen
+
+Idêntico ao AddMedicamentoScreen mas com os campos pré-preenchidos
+Recebe o ID do medicamento via params da navegação
+Ao guardar: atualiza o AsyncStorage, cancela as notificações antigas e reagenda as novas
+Botão vermelho "Eliminar Medicamento" no final do formulário com modal de confirmação
+
+
+4. ECRÃ DETALHES — DetalhesScreen
+O que mostrar:
+
+Header com nome do medicamento e botão de editar (ícone lápis) no topo direito
+Card grande com:
+
+Ícone da categoria
+Nome e dosagem em destaque
+Cor identificadora
+Data de início e fim
+Dias da tomada
+Instruções
+Nível de estoque com barra de progresso visual
+
+
+Secção "Horários de Hoje":
+
+Lista de todos os horários do dia
+Cada horário com status: ✅ Tomado / ⏰ Pendente / ❌ Saltado
+Botão "Marcar como tomado" para os pendentes
+
+
+Secção "Histórico Recente":
+
+Últimos 7 dias com indicadores coloridos (tomado/saltado/pendente)
+
+
+
+
+5. ECRÃ HISTÓRICO — HistoricoScreen
+O que mostrar:
+
+Filtro por medicamento (dropdown/picker)
+Filtro por período: Hoje / Esta semana / Este mês
+Lista de registos com:
+
+Data e hora
+Nome do medicamento
+Status (tomado/saltado)
+Ícone colorido por status
+
+
+Resumo no topo: percentagem de adesão ao tratamento (ex: "Aderência: 85%")
+
+
+SISTEMA DE NOTIFICAÇÕES — notificationService.js
+Implementar as seguintes funções:
+javascript// Pedir permissão ao utilizador
+async function requestPermissions()
+
+// Agendar notificação para um medicamento
+async function scheduleNotification(medicamento, horario, diasSemana)
+
+// Cancelar todas as notificações de um medicamento
+async function cancelNotifications(medicamentoId)
+
+// Cancelar todas as notificações do app
+async function cancelAllNotifications()
+
+// Listar notificações agendadas (para debug)
+async function listScheduledNotifications()
+Conteúdo da notificação:
+
+Título: "💊 Hora do teu medicamento!"
+Corpo: "[Nome do medicamento] — [Dosagem]"
+Subtítulo (iOS): "Toque para marcar como tomado"
+Som: som padrão do sistema
+Repetição: semanal nos dias selecionados
+
+
+SISTEMA DE ARMAZENAMENTO — storageService.js
+Estrutura dos dados no AsyncStorage:
+javascript// Chave: 'medicamentos'
+// Valor: array de objetos
+
+{
+  id: "uuid-unico",
+  nome: "Paracetamol",
+  dosagem: "500mg",
+  categoria: "comprimido",
+  cor: "#2D6A4F",
+  dataInicio: "2026-05-30",
+  dataFim: "2026-06-30",  // null se não tiver
+  horarios: ["08:00", "14:00", "20:00"],
+  diasSemana: [1, 2, 3, 4, 5],  // 0=Dom, 1=Seg, ..., 6=Sáb
+  instrucoes: "Tomar após refeições",
+  estoque: 30,
+  notificationIds: ["notif-id-1", "notif-id-2"],
+  ativo: true,
+  criadoEm: "2026-05-30T10:00:00.000Z"
+}
+
+// Chave: 'historico'
+// Valor: array de registos de tomas
+
+{
+  id: "uuid",
+  medicamentoId: "uuid-do-medicamento",
+  nomeMedicamento: "Paracetamol",
+  horario: "08:00",
+  dataHora: "2026-05-30T08:05:00.000Z",
+  status: "tomado"  // "tomado" | "saltado"
+}
+Funções a implementar:
+javascriptasync function getMedicamentos()
+async function saveMedicamento(medicamento)
+async function updateMedicamento(id, dadosAtualizados)
+async function deleteMedicamento(id)
+async function getHistorico()
+async function saveRegistoHistorico(registo)
+async function getHistoricoByMedicamento(medicamentoId)
+
+NAVEGAÇÃO — AppNavigator.js
+Stack Navigator (raiz)
+└── Bottom Tab Navigator
+    ├── Tab 1: Home (ícone: home-outline / home quando ativo)
+    └── Tab 2: Histórico (ícone: time-outline / time quando ativo)
+    
+Stack screens (sem tab):
+├── AddMedicamento
+├── EditMedicamento
+└── Detalhes
+Estilo do Tab Bar:
+
+Fundo branco com sombra suave no topo
+Cor ativa: #2D6A4F (verde)
+Cor inativa: #9CA3AF (cinza)
+Label em Poppins Medium tamanho 11
+Sem borda, apenas sombra
+Height: 60px
+Ícones tamanho 24px
+
+
+COMPONENTES DETALHADOS
+MedicamentoCard.js
+- Container: card branco, borderRadius 16, padding 16, shadow
+- Lado esquerdo: barra colorida vertical (4px largura) com a cor do medicamento
+- Ícone da categoria (32x32) com fundo circular colorido suave
+- Nome em Poppins SemiBold 16px
+- Dosagem em Poppins Regular 13px cor cinza
+- Próximo horário em Poppins Medium 14px cor verde
+- Botão "Tomado" pequeno no canto direito inferior (verde se pendente, cinza se tomado)
+- Chevron direito para indicar que é clicável
+EmptyState.js
+- Ícone grande centralizado (pill-outline, tamanho 80)
+- Cor do ícone: #95D5B2 (verde claro)
+- Título: "Nenhum medicamento" em Poppins SemiBold 20px
+- Subtítulo: "Toca no botão + para adicionar o teu primeiro medicamento"
+- Botão opcional "Adicionar agora" em verde
+ConfirmModal.js
+- Overlay escurecido
+- Modal centralizado com borderRadius 20
+- Ícone de alerta em vermelho
+- Título e mensagem personalizáveis
+- Dois botões: "Cancelar" (outline) e "Confirmar" (vermelho sólido)
+- Animação de entrada: scale de 0.8 para 1.0 com opacity
+Header.js
+- Fundo branco com sombra suave na parte inferior
+- Logo pequeno à esquerda (opcional)
+- Título centralizado em Poppins Bold 18px
+- Botão de ação à direita (opcional: editar, voltar, etc.)
+- Height: 56px
+- StatusBar com estilo dark-content
+
+ANIMAÇÕES E MICRO-INTERAÇÕES
+
+Marcar como tomado: botão faz scale de 1.0 → 0.9 → 1.0 com mudança de cor
+Adicionar medicamento: card novo entra com fadeIn + slideInUp
+Eliminar medicamento: card sai com fadeOut + slideOutRight
+FAB: rotação de 0° para 45° ao abrir (se tiver menu), pulse suave
+Loading states: ActivityIndicator verde nas operações assíncronas
+Toast de sucesso: aparece no topo por 3 segundos e desaparece com fadeOut
+
+
+TRATAMENTO DE ERROS E EDGE CASES
+
+Se o utilizador negar permissão de notificações → mostrar alerta explicando a importância e botão para ir às definições
+Se o AsyncStorage falhar → mostrar mensagem de erro e não fechar o ecrã
+Se não houver medicamentos → mostrar EmptyState
+Medicamentos com data de fim ultrapassada → mostrar como "Concluído" com cor diferente
+Estoque em zero → mostrar alerta vermelho "Estoque esgotado" no card
+
+
+CONFIGURAÇÃO DO app.json
+json{
+  "expo": {
+    "name": "MediLembrete",
+    "slug": "medilembrete",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#2D6A4F"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2D6A4F"
+      },
+      "package": "com.medilembrete.app",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "SCHEDULE_EXACT_ALARM"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.medilembrete.app",
+      "supportsTablet": false
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#2D6A4F",
+          "sounds": []
+        }
+      ]
+    ]
+  }
+}
+
+PACKAGE.JSON — DEPENDÊNCIAS
+json{
+  "dependencies": {
+    "expo": "~51.0.0",
+    "expo-status-bar": "~1.12.1",
+    "expo-notifications": "~0.28.0",
+    "expo-font": "~12.0.10",
+    "expo-datetime-picker": "latest",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-navigation/native": "^6.1.17",
+    "@react-navigation/stack": "^6.3.29",
+    "@react-navigation/bottom-tabs": "^6.5.20",
+    "react-native-screens": "~3.31.1",
+    "react-native-safe-area-context": "4.10.5",
+    "react-native-gesture-handler": "~2.16.1",
+    "@expo/vector-icons": "^14.0.2",
+    "date-fns": "^3.6.0",
+    "nanoid": "^5.0.7",
+    "react-native-reanimated": "~3.10.1"
+  }
+}
+
+INSTRUÇÕES FINAIS PARA O REPLIT
+
+Cria o projeto com: npx create-expo-app MediLembrete
+Instala todas as dependências listadas acima
+Implementa cada ficheiro seguindo exatamente a estrutura de pastas definida
+Usa a paleta de cores definida em src/constants/colors.js
+Carrega a fonte Poppins com expo-font antes de renderizar qualquer ecrã
+O app deve funcionar 100% offline — nenhuma chamada a API externa
+Todas as notificações são locais (expo-notifications)
+Testa o fluxo completo: adicionar → ver na lista → receber notificação → marcar como tomado → ver no histórico
+O código deve estar comentado em português
+Usa StyleSheet.create() para todos os estilos, nunca estilos inline

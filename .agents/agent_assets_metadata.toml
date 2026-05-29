@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "KPvW8w8Xu7E1G94BbImhC"
+uri = "file://artifacts/medilembrete/assets/images/icon.png"
+type = "image"
+title = "generated_image"
