@@ -8,13 +8,15 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MedicamentosProvider } from "@/context/MedicamentosContext";
+import SplashAnimado from "@/components/SplashAnimado";
 
+// Impede o splash nativo de desaparecer sozinho
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
@@ -58,12 +60,20 @@ export default function RootLayout() {
     Poppins_700Bold,
   });
 
+  // Controla se o splash animado ainda está visível
+  const [splashVisivel, setSplashVisivel] = useState(true);
+  // Controla se as fontes já estão prontas para o splash as usar
+  const [fontsProntas, setFontsProntas] = useState(false);
+
   useEffect(() => {
     if (fontsLoaded || fontError) {
+      // Esconde o splash nativo do Expo imediatamente
       SplashScreen.hideAsync();
+      setFontsProntas(true);
     }
   }, [fontsLoaded, fontError]);
 
+  // Enquanto as fontes não carregam, não mostra nada
   if (!fontsLoaded && !fontError) return null;
 
   return (
@@ -73,7 +83,13 @@ export default function RootLayout() {
           <MedicamentosProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
               <KeyboardProvider>
+                {/* App principal (renderizada por baixo do splash) */}
                 <RootLayoutNav />
+
+                {/* Splash animado sobreposto — desaparece após a animação */}
+                {splashVisivel && fontsProntas && (
+                  <SplashAnimado onFim={() => setSplashVisivel(false)} />
+                )}
               </KeyboardProvider>
             </GestureHandlerRootView>
           </MedicamentosProvider>
