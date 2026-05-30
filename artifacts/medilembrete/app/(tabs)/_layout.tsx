@@ -19,6 +19,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "clock", selected: "clock.fill" }} />
         <Label>Histórico</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="configuracoes">
+        <Icon sf={{ default: "bell", selected: "bell.fill" }} />
+        <Label>Notificações</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
@@ -88,6 +92,19 @@ function ClassicTabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "time" : "time-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="configuracoes"
+        options={{
+          title: "Notificações",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "notifications" : "notifications-outline"}
               size={24}
               color={color}
             />

@@ -4,14 +4,14 @@
     "slug": "medilembrete",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/logo.png",
     "scheme": "medilembrete",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.png",
+      "image": "./assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#2D6A4F"
+      "backgroundColor": "#0D2E1F"
     },
     "ios": {
       "supportsTablet": false,
@@ -19,8 +19,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#2D6A4F"
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#0D2E1F"
       },
       "package": "com.medilembrete.app",
       "permissions": [
@@ -30,7 +30,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/logo.png"
     },
     "plugins": [
       [
