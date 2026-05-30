@@ -20,6 +20,8 @@ import {
   cancelNotifications,
   configurarNotificacoes,
   notificarStockBaixo,
+  obterTotalNotificacoesAgendadas,
+  reagendarTodasNotificacoes,
   requestPermissions,
   scheduleNotification,
 } from "@/services/notificationService";
@@ -33,6 +35,7 @@ interface MedicamentosContextType {
   eliminarMedicamento: (id: string) => Promise<void>;
   marcarComoTomado: (medicamentoId: string, horario: string) => Promise<void>;
   recarregar: () => Promise<void>;
+  reagendarNotificacoes: () => Promise<number>;
   temPermissaoNotificacoes: boolean;
 }
 
@@ -44,24 +47,87 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(true);
   const [temPermissaoNotificacoes, setTemPermissaoNotificacoes] = useState(false);
 
-  const carregarDados = useCallback(async () => {
+  // ─── Inicialização ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const inicializar = async () => {
+      try {
+        // 1. Configurar handler e pedir permissão
+        await configurarNotificacoes();
+        const perm = await requestPermissions();
+        setTemPermissaoNotificacoes(perm);
+
+        // 2. Carregar dados
+        const [meds, hist] = await Promise.all([getMedicamentos(), getHistorico()]);
+        setMedicamentos(meds);
+        setHistorico(hist);
+        setLoading(false);
+
+        // 3. Reagendar TODAS as notificações no arranque
+        //    Isto recupera de reboots de telefone (Android apaga agendamentos)
+        if (perm && meds.length > 0) {
+          const mapaIds = await reagendarTodasNotificacoes(meds);
+
+          // Actualizar notificationIds em storage para medicamentos cujos IDs mudaram
+          const atualizacoes = Object.entries(mapaIds).map(async ([medId, novasIds]) => {
+            const med = meds.find((m) => m.id === medId);
+            if (!med) return;
+            const iguais =
+              JSON.stringify(med.notificationIds ?? []) === JSON.stringify(novasIds);
+            if (!iguais) {
+              await updateMedicamento(medId, { notificationIds: novasIds });
+            }
+          });
+          await Promise.all(atualizacoes);
+
+          // Actualizar estado em memória
+          setMedicamentos((prev) =>
+            prev.map((m) =>
+              mapaIds[m.id] !== undefined
+                ? { ...m, notificationIds: mapaIds[m.id] }
+                : m
+            )
+          );
+        }
+      } catch {
+        setLoading(false);
+      }
+    };
+
+    inicializar();
+  }, []);
+
+  // ─── Recarregar ────────────────────────────────────────────────────────────
+  const recarregar = useCallback(async () => {
     try {
       const [meds, hist] = await Promise.all([getMedicamentos(), getHistorico()]);
       setMedicamentos(meds);
       setHistorico(hist);
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error);
-    } finally {
-      setLoading(false);
-    }
+    } catch {}
   }, []);
 
-  useEffect(() => {
-    configurarNotificacoes();
-    requestPermissions().then(setTemPermissaoNotificacoes);
-    carregarDados();
-  }, [carregarDados]);
+  // ─── Reagendar manualmente (chamado da UI de configurações) ───────────────
+  const reagendarNotificacoes = useCallback(async (): Promise<number> => {
+    const meds = await getMedicamentos();
+    const mapaIds = await reagendarTodasNotificacoes(meds);
 
+    // Persistir novos IDs
+    await Promise.all(
+      Object.entries(mapaIds).map(([medId, ids]) =>
+        updateMedicamento(medId, { notificationIds: ids })
+      )
+    );
+
+    // Actualizar estado
+    setMedicamentos((prev) =>
+      prev.map((m) =>
+        mapaIds[m.id] !== undefined ? { ...m, notificationIds: mapaIds[m.id] } : m
+      )
+    );
+
+    return obterTotalNotificacoesAgendadas();
+  }, []);
+
+  // ─── Adicionar medicamento ─────────────────────────────────────────────────
   const adicionarMedicamento = useCallback(async (
     dados: Omit<Medicamento, "id" | "criadoEm" | "notificationIds">
   ) => {
@@ -71,42 +137,51 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
       criadoEm: new Date().toISOString(),
       notificationIds: [],
     };
+
     const notifIds = await scheduleNotification(novoMedicamento);
     novoMedicamento.notificationIds = notifIds;
     await saveMedicamento(novoMedicamento);
-    // Verifica stock imediatamente após adicionar
+
     if (novoMedicamento.estoque !== null && novoMedicamento.estoque <= 5) {
       await notificarStockBaixo(novoMedicamento);
     }
+
     setMedicamentos((prev) => [...prev, novoMedicamento]);
   }, []);
 
+  // ─── Editar medicamento ────────────────────────────────────────────────────
   const editarMedicamento = useCallback(async (
     id: string,
     dados: Omit<Medicamento, "id" | "criadoEm" | "notificationIds">
   ) => {
     const medExistente = medicamentos.find((m) => m.id === id);
+
+    // Cancelar notificações antigas
     if (medExistente?.notificationIds?.length) {
       await cancelNotifications(medExistente.notificationIds);
     }
+
     const medAtualizado: Medicamento = {
       ...dados,
       id,
       criadoEm: medExistente?.criadoEm ?? new Date().toISOString(),
       notificationIds: [],
     };
+
     const notifIds = await scheduleNotification(medAtualizado);
     medAtualizado.notificationIds = notifIds;
     await updateMedicamento(id, medAtualizado);
-    // Verifica stock após edição
+
     if (medAtualizado.estoque !== null && medAtualizado.estoque <= 5) {
       await notificarStockBaixo(medAtualizado);
     }
+
     setMedicamentos((prev) =>
       prev.map((m) => (m.id === id ? medAtualizado : m))
     );
   }, [medicamentos]);
 
+  // ─── Eliminar medicamento ──────────────────────────────────────────────────
   const eliminarMedicamento = useCallback(async (id: string) => {
     const med = medicamentos.find((m) => m.id === id);
     if (med?.notificationIds?.length) {
@@ -116,6 +191,7 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
     setMedicamentos((prev) => prev.filter((m) => m.id !== id));
   }, [medicamentos]);
 
+  // ─── Marcar como tomado ────────────────────────────────────────────────────
   const marcarComoTomado = useCallback(async (
     medicamentoId: string,
     horario: string
@@ -134,7 +210,7 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
     };
     await saveRegistoHistorico(registo);
 
-    // Decrementar stock se estiver definido
+    // Decrementar stock
     let novoStock = med.estoque;
     if (novoStock !== null && novoStock > 0) {
       novoStock = novoStock - 1;
@@ -142,7 +218,6 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
       setMedicamentos((prev) =>
         prev.map((m) => (m.id === medicamentoId ? { ...m, estoque: novoStock } : m))
       );
-      // Alertar se stock ficou baixo
       if (novoStock <= 5) {
         await notificarStockBaixo({ ...med, estoque: novoStock });
       }
@@ -161,7 +236,8 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
         editarMedicamento,
         eliminarMedicamento,
         marcarComoTomado,
-        recarregar: carregarDados,
+        recarregar,
+        reagendarNotificacoes,
         temPermissaoNotificacoes,
       }}
     >

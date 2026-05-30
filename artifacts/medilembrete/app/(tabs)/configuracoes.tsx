@@ -4,10 +4,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
-import { Image } from "react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
+  Image,
   Platform,
   ScrollView,
   StatusBar,
@@ -20,7 +21,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useMedicamentos } from "@/context/MedicamentosContext";
-import { requestPermissions } from "@/services/notificationService";
+import { obterTotalNotificacoesAgendadas, requestPermissions } from "@/services/notificationService";
 
 const CHAVE_CONFIG = "@medilembrete:config_notificacoes";
 
@@ -60,7 +61,7 @@ async function enviarNotificacaoTeste(): Promise<void> {
     const Notifications = await import("expo-notifications");
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: "✅ Notificações activas!",
+        title: "💊 Notificações activas!",
         body: "O MediLembrete irá lembrá-lo das suas tomas no horário certo.",
         sound: true,
       },
@@ -72,35 +73,85 @@ async function enviarNotificacaoTeste(): Promise<void> {
 export default function ConfiguracoesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { temPermissaoNotificacoes } = useMedicamentos();
+  const { temPermissaoNotificacoes, reagendarNotificacoes, medicamentos } = useMedicamentos();
+
   const [permissao, setPermissao] = useState(temPermissaoNotificacoes);
   const [config, setConfig] = useState<ConfigNotificacoes>(CONFIG_PADRAO);
   const [carregando, setCarregando] = useState(true);
+  const [totalAgendadas, setTotalAgendadas] = useState(0);
+  const [reagendando, setReagendando] = useState(false);
 
+  const spinAnim = useRef(new Animated.Value(0)).current;
   const topPadding = Platform.OS === "web" ? 0 : insets.top;
 
+  // ─── Carregar dados iniciais ───────────────────────────────────────────────
   useEffect(() => {
-    carregarConfig().then((c) => {
-      setConfig(c);
+    const carregar = async () => {
+      const cfg = await carregarConfig();
+      setConfig(cfg);
+      setPermissao(temPermissaoNotificacoes);
+      const total = await obterTotalNotificacoesAgendadas();
+      setTotalAgendadas(total);
       setCarregando(false);
-    });
-    setPermissao(temPermissaoNotificacoes);
+    };
+    carregar();
   }, [temPermissaoNotificacoes]);
 
-  const atualizarConfig = async (campo: keyof ConfigNotificacoes, valor: boolean | string) => {
+  // ─── Animação de spin para o botão reagendar ───────────────────────────────
+  const iniciarSpin = () => {
+    spinAnim.setValue(0);
+    Animated.loop(
+      Animated.timing(spinAnim, {
+        toValue: 1,
+        duration: 900,
+        useNativeDriver: true,
+      })
+    ).start();
+  };
+
+  const pararSpin = () => {
+    spinAnim.stopAnimation();
+    spinAnim.setValue(0);
+  };
+
+  const rotacao = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
+  // ─── Actualizar config e reagendar ────────────────────────────────────────
+  const atualizarConfig = async (
+    campo: keyof ConfigNotificacoes,
+    valor: boolean | string,
+    deveReagendar = false
+  ) => {
     const nova = { ...config, [campo]: valor };
     setConfig(nova);
     await guardarConfig(nova);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    if (deveReagendar && permissao) {
+      await fazerReagendar();
+    }
   };
 
+  const fazerReagendar = async () => {
+    if (reagendando) return;
+    setReagendando(true);
+    iniciarSpin();
+    try {
+      const total = await reagendarNotificacoes();
+      setTotalAgendadas(typeof total === "number" ? total : 0);
+    } catch {}
+    pararSpin();
+    setReagendando(false);
+  };
+
+  // ─── Permissão ─────────────────────────────────────────────────────────────
   const pedirPermissao = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (permissao) {
-      // Já tem permissão — abrir definições do sistema
-      if (Platform.OS === "ios" || Platform.OS === "android") {
-        Linking.openSettings();
-      }
+      Linking.openSettings();
       return;
     }
     const concedida = await requestPermissions();
@@ -108,7 +159,7 @@ export default function ConfiguracoesScreen() {
     if (!concedida) {
       Alert.alert(
         "Permissão negada",
-        "Para receber lembretes, acede às Definições do teu telefone e ativa as notificações para o MediLembrete.",
+        "Acede às Definições do teu telefone e ativa as notificações para o MediLembrete.",
         [
           { text: "Cancelar", style: "cancel" },
           { text: "Abrir Definições", onPress: () => Linking.openSettings() },
@@ -140,7 +191,7 @@ export default function ConfiguracoesScreen() {
       <View style={[styles.blob, styles.blob1]} />
       <View style={[styles.blob, styles.blob2]} />
 
-      {/* Header */}
+      {/* ─── Header ─────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: topPadding + 16 }]}>
         <View style={styles.headerTopo}>
           <View style={styles.logoWrap}>
@@ -150,7 +201,7 @@ export default function ConfiguracoesScreen() {
               resizeMode="cover"
             />
           </View>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.headerTitulo}>Configurações</Text>
             <Text style={styles.headerSub}>Notificações e preferências</Text>
           </View>
@@ -166,7 +217,7 @@ export default function ConfiguracoesScreen() {
               </Text>
               <Text style={styles.statusSub}>
                 {permissao
-                  ? "O MediLembrete pode enviar lembretes"
+                  ? `${medicamentos.filter(m => m.ativo).length} medicamento${medicamentos.filter(m => m.ativo).length !== 1 ? "s" : ""} activo${medicamentos.filter(m => m.ativo).length !== 1 ? "s" : ""} · ${totalAgendadas} alarme${totalAgendadas !== 1 ? "s" : ""} agendado${totalAgendadas !== 1 ? "s" : ""}`
                   : "Toca para activar nas Definições"}
               </Text>
             </View>
@@ -181,16 +232,17 @@ export default function ConfiguracoesScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Conteúdo glass */}
+      {/* ─── Conteúdo ───────────────────────────────────────────────────── */}
       <View style={styles.conteudo}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
         >
+
           {/* Secção: Tipos de notificação */}
           <Text style={[styles.secaoTitulo, { color: colors.textSecondary }]}>TIPOS DE NOTIFICAÇÃO</Text>
 
-          <View style={[styles.secaoCard, { backgroundColor: colors.card, borderColor: "rgba(255,255,255,0.6)" }]}>
+          <View style={[styles.secaoCard, { backgroundColor: colors.card }]}>
             <ConfigRow
               icone="medical"
               iconeCor="#2D6A4F"
@@ -198,7 +250,7 @@ export default function ConfiguracoesScreen() {
               titulo="Lembretes de medicamentos"
               descricao="Notificação nos horários agendados de cada medicamento"
               valor={config.lembretesMedicamentos}
-              onChange={(v) => atualizarConfig("lembretesMedicamentos", v)}
+              onChange={(v) => atualizarConfig("lembretesMedicamentos", v, true)}
               disabled={!permissao}
               separador
             />
@@ -217,38 +269,38 @@ export default function ConfiguracoesScreen() {
           {/* Secção: Silêncio noturno */}
           <Text style={[styles.secaoTitulo, { color: colors.textSecondary }]}>SILÊNCIO NOTURNO</Text>
 
-          <View style={[styles.secaoCard, { backgroundColor: colors.card, borderColor: "rgba(255,255,255,0.6)" }]}>
+          <View style={[styles.secaoCard, { backgroundColor: colors.card }]}>
             <ConfigRow
               icone="moon"
               iconeCor="#6366F1"
               iconeFundo="#EDE9FE"
               titulo="Silêncio noturno"
-              descricao="Suspender notificações durante a noite"
+              descricao="Suspender notificações durante a noite; reagenda automaticamente"
               valor={config.silencioNoturnoAtivo}
-              onChange={(v) => atualizarConfig("silencioNoturnoAtivo", v)}
+              onChange={(v) => atualizarConfig("silencioNoturnoAtivo", v, true)}
               disabled={!permissao}
-              separador
+              separador={config.silencioNoturnoAtivo}
             />
 
             {config.silencioNoturnoAtivo && (
               <View style={styles.silencioHorarios}>
                 <HorarioChip
-                  label="Início"
+                  label="Início do silêncio"
                   horario={config.silencioInicio}
                   icone="moon-outline"
                   cor="#6366F1"
-                  onChange={(h) => atualizarConfig("silencioInicio", h)}
+                  onChange={(h) => atualizarConfig("silencioInicio", h, true)}
                   opcoesHorario={["20:00", "21:00", "22:00", "23:00", "00:00"]}
                 />
                 <View style={styles.silencioSeta}>
                   <Ionicons name="arrow-forward" size={16} color={colors.mutedForeground} />
                 </View>
                 <HorarioChip
-                  label="Fim"
+                  label="Fim do silêncio"
                   horario={config.silencioFim}
                   icone="sunny-outline"
                   cor="#D97706"
-                  onChange={(h) => atualizarConfig("silencioFim", h)}
+                  onChange={(h) => atualizarConfig("silencioFim", h, true)}
                   opcoesHorario={["05:00", "06:00", "07:00", "08:00", "09:00"]}
                 />
               </View>
@@ -258,7 +310,35 @@ export default function ConfiguracoesScreen() {
           {/* Secção: Ferramentas */}
           <Text style={[styles.secaoTitulo, { color: colors.textSecondary }]}>FERRAMENTAS</Text>
 
-          <View style={[styles.secaoCard, { backgroundColor: colors.card, borderColor: "rgba(255,255,255,0.6)" }]}>
+          <View style={[styles.secaoCard, { backgroundColor: colors.card }]}>
+
+            {/* Reagendar tudo */}
+            <TouchableOpacity
+              style={[styles.acaoRow, reagendando && { opacity: 0.7 }]}
+              onPress={fazerReagendar}
+              activeOpacity={0.7}
+              disabled={reagendando || !permissao}
+            >
+              <View style={[styles.acaoIcone, { backgroundColor: "#D1FAE5" }]}>
+                <Animated.View style={{ transform: [{ rotate: rotacao }] }}>
+                  <Ionicons name="refresh" size={20} color="#059669" />
+                </Animated.View>
+              </View>
+              <View style={styles.acaoInfo}>
+                <Text style={[styles.acaoTitulo, { color: colors.text }]}>
+                  {reagendando ? "A reagendar…" : "Reagendar tudo"}
+                </Text>
+                <Text style={[styles.acaoDescricao, { color: colors.textSecondary }]}>
+                  {totalAgendadas > 0
+                    ? `${totalAgendadas} alarme${totalAgendadas !== 1 ? "s" : ""} activo${totalAgendadas !== 1 ? "s" : ""} · recomendado após reboot`
+                    : "Recria todos os alarmes de medicamentos"}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.border} />
+            </TouchableOpacity>
+
+            <View style={[styles.separador, { backgroundColor: colors.border }]} />
+
             {/* Testar notificação */}
             <TouchableOpacity
               style={styles.acaoRow}
@@ -305,11 +385,10 @@ export default function ConfiguracoesScreen() {
           <View style={[styles.infoCard, { backgroundColor: colors.primary + "10", borderColor: colors.primary + "30" }]}>
             <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
             <Text style={[styles.infoTexto, { color: colors.primary }]}>
-              O MediLembrete usa apenas notificações locais — os teus dados nunca saem do dispositivo e não é necessária ligação à Internet.
+              Todas as notificações são locais — os teus dados nunca saem do dispositivo e não é necessária ligação à Internet.
             </Text>
           </View>
 
-          {/* Versão */}
           <Text style={[styles.versao, { color: colors.mutedForeground }]}>
             MediLembrete v1.0 · 100% offline
           </Text>
@@ -319,7 +398,7 @@ export default function ConfiguracoesScreen() {
   );
 }
 
-// Linha de configuração com switch
+// ─── Linha de configuração com switch ────────────────────────────────────────
 function ConfigRow({
   icone,
   iconeCor,
@@ -366,7 +445,7 @@ function ConfigRow({
   );
 }
 
-// Chip de horário com seleção
+// ─── Chip de horário com dropdown ────────────────────────────────────────────
 function HorarioChip({
   label,
   horario,
@@ -423,22 +502,12 @@ function HorarioChip({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
   blob: { position: "absolute", borderRadius: 999, opacity: 0.18 },
   blob1: { width: 280, height: 280, backgroundColor: "#52B788", top: -60, right: -80 },
   blob2: { width: 200, height: 200, backgroundColor: "#95D5B2", top: 120, left: -70 },
 
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    gap: 16,
-    zIndex: 1,
-  },
-  headerTopo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
+  header: { paddingHorizontal: 20, paddingBottom: 20, gap: 16, zIndex: 1 },
+  headerTopo: { flexDirection: "row", alignItems: "center", gap: 14 },
   logoWrap: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
@@ -447,22 +516,9 @@ const styles = StyleSheet.create({
     elevation: 6,
     borderRadius: 16,
   },
-  logoImg: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-  },
-  headerTitulo: {
-    fontSize: 24,
-    fontFamily: "Poppins_700Bold",
-    color: "#fff",
-  },
-  headerSub: {
-    fontSize: 13,
-    fontFamily: "Poppins_400Regular",
-    color: "rgba(255,255,255,0.65)",
-    marginTop: 2,
-  },
+  logoImg: { width: 52, height: 52, borderRadius: 14 },
+  headerTitulo: { fontSize: 24, fontFamily: "Poppins_700Bold", color: "#fff" },
+  headerSub: { fontSize: 13, fontFamily: "Poppins_400Regular", color: "rgba(255,255,255,0.65)", marginTop: 2 },
 
   glassPanel: {
     backgroundColor: "rgba(255,255,255,0.12)",
@@ -475,39 +531,13 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 6,
   },
-  statusCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    gap: 12,
-  },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    flexShrink: 0,
-  },
+  statusCard: { flexDirection: "row", alignItems: "center", padding: 16, gap: 12 },
+  statusDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
   statusInfo: { flex: 1 },
-  statusTitulo: {
-    fontSize: 15,
-    fontFamily: "Poppins_600SemiBold",
-    color: "#fff",
-  },
-  statusSub: {
-    fontSize: 12,
-    fontFamily: "Poppins_400Regular",
-    color: "rgba(255,255,255,0.65)",
-    marginTop: 2,
-  },
-  statusBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  statusTitulo: { fontSize: 15, fontFamily: "Poppins_600SemiBold", color: "#fff" },
+  statusSub: { fontSize: 12, fontFamily: "Poppins_400Regular", color: "rgba(255,255,255,0.65)", marginTop: 2 },
+  statusBadge: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
 
-  // Conteúdo
   conteudo: {
     flex: 1,
     backgroundColor: "rgba(255,255,255,0.93)",
@@ -516,11 +546,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     zIndex: 1,
   },
-  scroll: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    gap: 8,
-  },
+  scroll: { paddingHorizontal: 20, paddingTop: 20, gap: 8 },
 
   secaoTitulo: {
     fontSize: 11,
@@ -533,6 +559,7 @@ const styles = StyleSheet.create({
   secaoCard: {
     borderRadius: 18,
     borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.6)",
     overflow: "hidden",
     shadowColor: "#2D6A4F",
     shadowOffset: { width: 0, height: 3 },
@@ -542,60 +569,19 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  // Linha de configuração
-  configRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    gap: 12,
-  },
-  configIcone: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
+  configRow: { flexDirection: "row", alignItems: "center", padding: 16, gap: 12 },
+  configIcone: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   configInfo: { flex: 1, gap: 2 },
-  configTitulo: {
-    fontSize: 14,
-    fontFamily: "Poppins_600SemiBold",
-  },
-  configDescricao: {
-    fontSize: 12,
-    fontFamily: "Poppins_400Regular",
-    lineHeight: 17,
-  },
+  configTitulo: { fontSize: 14, fontFamily: "Poppins_600SemiBold" },
+  configDescricao: { fontSize: 12, fontFamily: "Poppins_400Regular", lineHeight: 17 },
   separador: { height: 1, marginHorizontal: 16 },
 
-  // Silêncio noturno
-  silencioHorarios: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    gap: 8,
-  },
+  silencioHorarios: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 16, gap: 8 },
   silencioSeta: { paddingHorizontal: 4 },
   horarioWrap: { flex: 1, gap: 6, position: "relative" },
-  horarioLabel: {
-    fontSize: 11,
-    fontFamily: "Poppins_500Medium",
-  },
-  horarioChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1.5,
-  },
-  horarioTexto: {
-    fontSize: 14,
-    fontFamily: "Poppins_600SemiBold",
-  },
+  horarioLabel: { fontSize: 11, fontFamily: "Poppins_500Medium" },
+  horarioChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5 },
+  horarioTexto: { fontSize: 14, fontFamily: "Poppins_600SemiBold" },
   horarioDropdown: {
     position: "absolute",
     top: 64,
@@ -610,65 +596,17 @@ const styles = StyleSheet.create({
     zIndex: 10,
     overflow: "hidden",
   },
-  horarioOpcao: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  horarioOpcaoTexto: {
-    fontSize: 14,
-    fontFamily: "Poppins_500Medium",
-  },
+  horarioOpcao: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12 },
+  horarioOpcaoTexto: { fontSize: 14, fontFamily: "Poppins_500Medium" },
 
-  // Ações
-  acaoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    gap: 12,
-  },
-  acaoIcone: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
+  acaoRow: { flexDirection: "row", alignItems: "center", padding: 16, gap: 12 },
+  acaoIcone: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   acaoInfo: { flex: 1, gap: 2 },
-  acaoTitulo: {
-    fontSize: 14,
-    fontFamily: "Poppins_600SemiBold",
-  },
-  acaoDescricao: {
-    fontSize: 12,
-    fontFamily: "Poppins_400Regular",
-  },
+  acaoTitulo: { fontSize: 14, fontFamily: "Poppins_600SemiBold" },
+  acaoDescricao: { fontSize: 12, fontFamily: "Poppins_400Regular" },
 
-  // Info card
-  infoCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 8,
-  },
-  infoTexto: {
-    flex: 1,
-    fontSize: 12,
-    fontFamily: "Poppins_400Regular",
-    lineHeight: 18,
-  },
+  infoCard: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 14, borderRadius: 14, borderWidth: 1, marginTop: 8 },
+  infoTexto: { flex: 1, fontSize: 12, fontFamily: "Poppins_400Regular", lineHeight: 18 },
 
-  versao: {
-    textAlign: "center",
-    fontSize: 12,
-    fontFamily: "Poppins_400Regular",
-    marginTop: 8,
-    marginBottom: 4,
-  },
+  versao: { textAlign: "center", fontSize: 12, fontFamily: "Poppins_400Regular", marginTop: 8, marginBottom: 4 },
 });
