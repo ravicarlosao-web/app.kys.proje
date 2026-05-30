@@ -1,4 +1,4 @@
-// Ecrã inicial — design premium nível X / Facebook
+// Ecrã inicial — glassmorphism + gradiente premium
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -31,9 +31,9 @@ import { Medicamento } from "@/types";
 
 function getSaudacao(): string {
   const h = new Date().getHours();
-  if (h >= 5 && h < 12) return "Bom dia!";
-  if (h >= 12 && h < 18) return "Boa tarde!";
-  return "Boa noite!";
+  if (h >= 5 && h < 12) return "Bom dia ☀️";
+  if (h >= 12 && h < 18) return "Boa tarde 🌤️";
+  return "Boa noite 🌙";
 }
 
 function formatarData(): string {
@@ -52,17 +52,19 @@ function FAB({ onPress }: { onPress: () => void }) {
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <AnimatedTouchable
-      onPressIn={() => { scale.value = withSpring(0.9); }}
+      onPressIn={() => { scale.value = withSpring(0.88); }}
       onPressOut={() => { scale.value = withSpring(1); }}
       onPress={onPress}
       activeOpacity={1}
       style={[styles.fab, style]}
     >
       <LinearGradient
-        colors={["#3D8B6A", "#2D6A4F"]}
-        style={styles.fabGradient}
+        colors={["#52C98A", "#2D6A4F"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.fabInner}
       >
-        <Ionicons name="add" size={28} color="#fff" />
+        <Ionicons name="add" size={30} color="#fff" />
       </LinearGradient>
     </AnimatedTouchable>
   );
@@ -88,33 +90,22 @@ export default function HomeScreen() {
   const totalDosesHoje = medsHoje.reduce((acc, m) => acc + m.horarios.length, 0);
   const dosesTomadas = dosesTomadasHoje.size;
   const dosesPendentes = Math.max(0, totalDosesHoje - dosesTomadas);
-  const aderencia = totalDosesHoje > 0
-    ? Math.round((dosesTomadas / totalDosesHoje) * 100)
-    : 0;
+  const aderencia = totalDosesHoje > 0 ? Math.round((dosesTomadas / totalDosesHoje) * 100) : 0;
 
-  // Alertas de stock baixo
   const medsStockBaixo = useMemo(
-    () => medicamentos.filter(
-      (m) => m.ativo && m.estoque !== null && m.estoque <= 5
-    ),
+    () => medicamentos.filter((m) => m.ativo && m.estoque !== null && m.estoque <= 5),
     [medicamentos]
   );
 
-  const handleMarcarTomado = useCallback(
-    async (med: Medicamento) => {
-      const horarioPendente = med.horarios.find(
-        (h) => !dosesTomadasHoje.has(`${med.id}-${h}`)
-      );
-      if (!horarioPendente) return;
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await marcarComoTomado(med.id, horarioPendente);
-    },
-    [dosesTomadasHoje, marcarComoTomado]
-  );
+  const handleMarcarTomado = useCallback(async (med: Medicamento) => {
+    const horarioPendente = med.horarios.find((h) => !dosesTomadasHoje.has(`${med.id}-${h}`));
+    if (!horarioPendente) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await marcarComoTomado(med.id, horarioPendente);
+  }, [dosesTomadasHoje, marcarComoTomado]);
 
   const isMedTomadoHoje = useCallback(
-    (med: Medicamento): boolean =>
-      med.horarios.every((h) => dosesTomadasHoje.has(`${med.id}-${h}`)),
+    (med: Medicamento) => med.horarios.every((h) => dosesTomadasHoje.has(`${med.id}-${h}`)),
     [dosesTomadasHoje]
   );
 
@@ -122,19 +113,21 @@ export default function HomeScreen() {
 
   const ListHeader = (
     <View>
-      {/* Banner de alertas de stock */}
       {medsStockBaixo.length > 0 && (
-        <View style={[styles.stockBanner, { backgroundColor: "#FEF3C7" }]}>
-          <Ionicons name="warning" size={16} color="#D97706" />
-          <Text style={[styles.stockBannerTexto, { color: "#92400E" }]}>
-            {medsStockBaixo.length === 1
-              ? `"${medsStockBaixo[0].nome}" com stock baixo`
-              : `${medsStockBaixo.length} medicamentos com stock baixo`}
-          </Text>
+        <View style={styles.stockBanner}>
+          <LinearGradient
+            colors={["rgba(245,158,11,0.15)", "rgba(245,158,11,0.05)"]}
+            style={styles.stockBannerGradient}
+          >
+            <Ionicons name="warning" size={16} color="#D97706" />
+            <Text style={styles.stockBannerTexto}>
+              {medsStockBaixo.length === 1
+                ? `"${medsStockBaixo[0].nome}" com stock baixo`
+                : `${medsStockBaixo.length} medicamentos com stock baixo`}
+            </Text>
+          </LinearGradient>
         </View>
       )}
-
-      {/* Secção título */}
       <View style={styles.secaoHeader}>
         <Text style={[styles.secaoTitulo, { color: colors.text }]}>
           {totalMeds === 0 ? "Os teus medicamentos" : `${totalMeds} medicamento${totalMeds === 1 ? "" : "s"}`}
@@ -149,147 +142,130 @@ export default function HomeScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Header gradiente */}
+      {/* Fundo gradiente de toda a tela */}
       <LinearGradient
-        colors={["#1A4D38", "#2D6A4F", "#3D8B6A"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: topPadding + 16 }]}
-      >
-        {/* Linha superior: saudação + ícone */}
+        colors={["#0D2E1F", "#1A4D38", "#2D6A4F", "#3D8B6A", "#74C69D"]}
+        locations={[0, 0.2, 0.4, 0.6, 1]}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* Círculos decorativos glassmorphism */}
+      <View style={[styles.blob, styles.blob1]} />
+      <View style={[styles.blob, styles.blob2]} />
+
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: topPadding + 16 }]}>
         <View style={styles.headerTopo}>
-          <View style={styles.saudacaoWrapper}>
+          <View>
             <Text style={styles.saudacao}>{getSaudacao()}</Text>
             <Text style={styles.headerData}>{formatarData()}</Text>
           </View>
           <TouchableOpacity
-            style={styles.headerIconeBtn}
+            style={styles.headerBotao}
             onPress={() => router.push("/adicionar")}
           >
-            <Ionicons name="add-circle-outline" size={28} color="rgba(255,255,255,0.9)" />
+            <Ionicons name="add" size={24} color="#fff" />
           </TouchableOpacity>
         </View>
 
-        {/* Stats chips */}
-        <View style={styles.statsRow}>
-          <StatChip label="Total" valor={totalMeds} icone="albums-outline" />
-          <View style={styles.statsDivisor} />
-          <StatChip label="Tomados" valor={dosesTomadas} icone="checkmark-circle-outline" destaque={dosesTomadas > 0} />
-          <View style={styles.statsDivisor} />
-          <StatChip label="Pendentes" valor={dosesPendentes} icone="time-outline" alerta={dosesPendentes > 0} />
-        </View>
-
-        {/* Barra de aderência */}
-        {totalDosesHoje > 0 && (
-          <View style={styles.aderenciaContainer}>
-            <View style={styles.aderenciaHeader}>
-              <Text style={styles.aderenciaLabel}>Aderência de hoje</Text>
-              <Text style={styles.aderenciaPercent}>{aderencia}%</Text>
-            </View>
-            <View style={styles.aderenciaBarra}>
-              <Animated.View
-                style={[
-                  styles.aderenciaProgresso,
-                  { width: `${aderencia}%` as `${number}%` },
-                ]}
-              />
-            </View>
+        {/* Painel glass de estatísticas */}
+        <View style={styles.glassPanel}>
+          <View style={styles.statsRow}>
+            <StatItem icone="albums-outline" valor={totalMeds} label="Total" />
+            <View style={styles.statDiv} />
+            <StatItem icone="checkmark-circle-outline" valor={dosesTomadas} label="Tomados" verde />
+            <View style={styles.statDiv} />
+            <StatItem icone="time-outline" valor={dosesPendentes} label="Pendentes" alerta={dosesPendentes > 0} />
           </View>
-        )}
-      </LinearGradient>
 
-      {/* Lista de medicamentos */}
-      {loading ? (
-        <View style={styles.centrado}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.carregandoTexto, { color: colors.textSecondary }]}>
-            A carregar...
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={medicamentos.filter((m) => m.ativo)}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={[
-            styles.lista,
-            { paddingBottom: insets.bottom + 110, flexGrow: 1 },
-          ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={loading}
-              onRefresh={recarregar}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
-            />
-          }
-          ListHeaderComponent={ListHeader}
-          ListEmptyComponent={
-            <EmptyState onAdicionar={() => router.push("/adicionar")} />
-          }
-          renderItem={({ item }) => (
-            <MedicamentoCard
-              medicamento={item}
-              tomadoHoje={isMedTomadoHoje(item)}
-              dosesTomadasHoje={dosesTomadasHoje}
-              onPress={() => router.push(`/detalhes/${item.id}`)}
-              onMarcarTomado={() => handleMarcarTomado(item)}
-            />
+          {totalDosesHoje > 0 && (
+            <View style={styles.aderenciaWrap}>
+              <View style={styles.aderenciaTextos}>
+                <Text style={styles.aderenciaLabel}>Aderência hoje</Text>
+                <Text style={[styles.aderenciaValor, { color: aderencia >= 80 ? "#6EE7B7" : aderencia >= 50 ? "#FCD34D" : "#FCA5A5" }]}>
+                  {aderencia}%
+                </Text>
+              </View>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, {
+                  width: `${aderencia}%` as `${number}%`,
+                  backgroundColor: aderencia >= 80 ? "#6EE7B7" : aderencia >= 50 ? "#FCD34D" : "#FCA5A5",
+                }]} />
+              </View>
+            </View>
           )}
-        />
-      )}
+        </View>
+      </View>
 
-      {/* FAB animado */}
+      {/* Lista sobre fundo glass claro */}
+      <View style={styles.listaContainer}>
+        {loading ? (
+          <View style={styles.centrado}>
+            <ActivityIndicator size="large" color="#2D6A4F" />
+          </View>
+        ) : (
+          <FlatList
+            data={medicamentos.filter((m) => m.ativo)}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={[
+              styles.lista,
+              { paddingBottom: insets.bottom + 110, flexGrow: 1 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={loading}
+                onRefresh={recarregar}
+                tintColor="#2D6A4F"
+                colors={["#2D6A4F"]}
+              />
+            }
+            ListHeaderComponent={ListHeader}
+            ListEmptyComponent={<EmptyState onAdicionar={() => router.push("/adicionar")} />}
+            renderItem={({ item }) => (
+              <MedicamentoCard
+                medicamento={item}
+                tomadoHoje={isMedTomadoHoje(item)}
+                dosesTomadasHoje={dosesTomadasHoje}
+                onPress={() => router.push(`/detalhes/${item.id}`)}
+                onMarcarTomado={() => handleMarcarTomado(item)}
+              />
+            )}
+          />
+        )}
+      </View>
+
       <FAB
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           router.push("/adicionar");
         }}
       />
-      {/* Posicionar FAB */}
-      <View
-        pointerEvents="none"
-        style={[styles.fabAnchor, { bottom: insets.bottom + 72 }]}
-      />
     </View>
   );
 }
 
-// Chip de estatística no header
-function StatChip({
-  label,
-  valor,
+function StatItem({
   icone,
-  destaque,
+  valor,
+  label,
+  verde,
   alerta,
 }: {
-  label: string;
-  valor: number;
   icone: keyof typeof Ionicons.glyphMap;
-  destaque?: boolean;
+  valor: number;
+  label: string;
+  verde?: boolean;
   alerta?: boolean;
 }) {
+  const cor = alerta ? "#FCD34D" : verde ? "#6EE7B7" : "rgba(255,255,255,0.85)";
   return (
-    <View style={styles.statChip}>
-      <View style={styles.statChipIcone}>
-        <Ionicons
-          name={icone}
-          size={14}
-          color={alerta ? "#FCD34D" : destaque ? "#6EE7B7" : "rgba(255,255,255,0.7)"}
-        />
-      </View>
-      <Text
-        style={[
-          styles.statValor,
-          alerta && { color: "#FCD34D" },
-          destaque && { color: "#6EE7B7" },
-        ]}
-      >
-        {valor}
-      </Text>
+    <View style={styles.statItem}>
+      <Ionicons name={icone} size={14} color={cor} style={{ marginBottom: 4 }} />
+      <Text style={[styles.statValor, { color: cor }]}>{valor}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
@@ -298,72 +274,101 @@ function StatChip({
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
+  // Blobs decorativos (simulam glassmorphism depth)
+  blob: {
+    position: "absolute",
+    borderRadius: 999,
+    opacity: 0.18,
+  },
+  blob1: {
+    width: 280,
+    height: 280,
+    backgroundColor: "#52B788",
+    top: -60,
+    right: -80,
+  },
+  blob2: {
+    width: 200,
+    height: 200,
+    backgroundColor: "#95D5B2",
+    top: 120,
+    left: -70,
+  },
+
   // Header
   header: {
     paddingHorizontal: 20,
     paddingBottom: 20,
     gap: 16,
+    zIndex: 1,
   },
   headerTopo: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  saudacaoWrapper: { gap: 2 },
   saudacao: {
-    fontSize: 24,
+    fontSize: 26,
     fontFamily: "Poppins_700Bold",
     color: "#fff",
-    lineHeight: 30,
+    lineHeight: 32,
   },
   headerData: {
     fontSize: 13,
     fontFamily: "Poppins_400Regular",
-    color: "rgba(255,255,255,0.75)",
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 2,
   },
-  headerIconeBtn: {
+  headerBotao: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
     alignItems: "center",
     justifyContent: "center",
   },
 
-  // Stats
+  // Glass panel
+  glassPanel: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+    padding: 16,
+    gap: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
   statsRow: {
     flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 16,
-    padding: 14,
     alignItems: "center",
   },
-  statChip: {
-    flex: 1,
-    alignItems: "center",
-    gap: 3,
-  },
-  statChipIcone: { marginBottom: 2 },
+  statItem: { flex: 1, alignItems: "center" },
   statValor: {
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: "Poppins_700Bold",
+    lineHeight: 28,
     color: "#fff",
-    lineHeight: 26,
   },
   statLabel: {
     fontSize: 11,
     fontFamily: "Poppins_500Medium",
-    color: "rgba(255,255,255,0.65)",
+    color: "rgba(255,255,255,0.6)",
   },
-  statsDivisor: {
+  statDiv: {
     width: 1,
-    height: 36,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    height: 40,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
 
   // Aderência
-  aderenciaContainer: { gap: 8 },
-  aderenciaHeader: {
+  aderenciaWrap: { gap: 8 },
+  aderenciaTextos: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -371,40 +376,40 @@ const styles = StyleSheet.create({
   aderenciaLabel: {
     fontSize: 12,
     fontFamily: "Poppins_500Medium",
-    color: "rgba(255,255,255,0.7)",
+    color: "rgba(255,255,255,0.65)",
   },
-  aderenciaPercent: {
+  aderenciaValor: {
     fontSize: 13,
     fontFamily: "Poppins_700Bold",
-    color: "#6EE7B7",
   },
-  aderenciaBarra: {
-    height: 6,
-    backgroundColor: "rgba(255,255,255,0.18)",
+  progressBar: {
+    height: 5,
+    backgroundColor: "rgba(255,255,255,0.15)",
     borderRadius: 3,
     overflow: "hidden",
   },
-  aderenciaProgresso: {
-    height: 6,
-    backgroundColor: "#6EE7B7",
+  progressFill: {
+    height: 5,
     borderRadius: 3,
   },
 
-  // Stock banner
-  stockBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginHorizontal: 0,
-    marginBottom: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  stockBannerTexto: {
-    fontSize: 13,
-    fontFamily: "Poppins_500Medium",
+  // Lista glass container
+  listaContainer: {
     flex: 1,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: "hidden",
+    zIndex: 1,
+  },
+  lista: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  centrado: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // Seção
@@ -423,20 +428,26 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_600SemiBold",
   },
 
-  // Lista
-  lista: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+  // Stock banner
+  stockBanner: {
+    borderRadius: 14,
+    overflow: "hidden",
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.3)",
   },
-  centrado: {
-    flex: 1,
+  stockBannerGradient: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-  carregandoTexto: {
-    fontSize: 14,
-    fontFamily: "Poppins_400Regular",
+  stockBannerTexto: {
+    fontSize: 13,
+    fontFamily: "Poppins_500Medium",
+    color: "#92400E",
+    flex: 1,
   },
 
   // FAB
@@ -444,26 +455,20 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 20,
     bottom: 82,
+    shadowColor: "#2D6A4F",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 12,
+    borderRadius: 30,
+  },
+  fabInner: {
     width: 58,
     height: 58,
     borderRadius: 29,
-    shadowColor: "#2D6A4F",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 10,
-    overflow: "hidden",
-  },
-  fabGradient: {
-    width: 58,
-    height: 58,
     alignItems: "center",
     justifyContent: "center",
-  },
-  fabAnchor: {
-    position: "absolute",
-    right: 20,
-    height: 58,
-    width: 58,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
   },
 });

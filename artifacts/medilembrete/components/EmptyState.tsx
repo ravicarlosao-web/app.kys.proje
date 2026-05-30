@@ -1,4 +1,4 @@
-// Estado vazio — design premium
+// Estado vazio — glassmorphism + gradiente
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
@@ -21,50 +21,59 @@ export default function EmptyState({
   return (
     <View style={styles.container}>
       {/* Ícone em gradiente */}
-      <View style={styles.iconeContainer}>
-        <LinearGradient
-          colors={["#E8F5EF", "#D1EEE2"]}
-          style={styles.iconeGradient}
-        >
-          <View style={[styles.iconeInner, { backgroundColor: colors.accent + "40" }]}>
-            <Ionicons name="medkit-outline" size={52} color={colors.primary} />
-          </View>
-        </LinearGradient>
-      </View>
+      <LinearGradient
+        colors={["#D1FAE5", "#A7F3D0", "#6EE7B7"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.iconeGradient}
+      >
+        <View style={styles.iconeInner}>
+          <Ionicons name="medkit-outline" size={52} color="#1B5E3C" />
+        </View>
+      </LinearGradient>
 
-      {/* Texto */}
+      {/* Textos */}
       <View style={styles.textos}>
         <Text style={[styles.titulo, { color: colors.text }]}>{titulo}</Text>
-        <Text style={[styles.subtitulo, { color: colors.textSecondary }]}>
-          {subtitulo}
-        </Text>
+        <Text style={[styles.subtitulo, { color: colors.textSecondary }]}>{subtitulo}</Text>
       </View>
 
-      {/* Features list */}
-      <View style={[styles.featuresList, { backgroundColor: colors.card }]}>
+      {/* Cards glass de funcionalidades */}
+      <View style={styles.features}>
         {[
-          { icone: "notifications", texto: "Lembretes nos horários que escolheres" },
-          { icone: "checkmark-circle", texto: "Regista cada dose tomada" },
-          { icone: "stats-chart", texto: "Acompanha a tua aderência ao tratamento" },
+          { icone: "notifications" as const, texto: "Notificações nos horários que escolheres", grad: ["#D1FAE5", "#ECFDF5"] as [string, string] },
+          { icone: "checkmark-circle" as const, texto: "Regista cada dose tomada com um toque", grad: ["#DBEAFE", "#EFF6FF"] as [string, string] },
+          { icone: "stats-chart" as const, texto: "Acompanha a aderência ao tratamento", grad: ["#EDE9FE", "#F5F3FF"] as [string, string] },
         ].map((f, i) => (
-          <View key={i} style={[styles.featureItem, i < 2 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
-            <View style={[styles.featureIcone, { backgroundColor: colors.primary + "12" }]}>
-              <Ionicons name={f.icone as keyof typeof Ionicons.glyphMap} size={16} color={colors.primary} />
+          <LinearGradient
+            key={i}
+            colors={f.grad}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.featureCard, {
+              borderColor: "rgba(255,255,255,0.8)",
+            }]}
+          >
+            <View style={[styles.featureIcone, { backgroundColor: "rgba(255,255,255,0.7)" }]}>
+              <Ionicons name={f.icone} size={18} color={colors.primary} />
             </View>
             <Text style={[styles.featureTexto, { color: colors.text }]}>{f.texto}</Text>
-          </View>
+          </LinearGradient>
         ))}
       </View>
 
-      {/* CTA button */}
+      {/* Botão CTA com gradiente */}
       {onAdicionar && (
-        <TouchableOpacity
-          style={[styles.botao, { backgroundColor: colors.primary }]}
-          onPress={onAdicionar}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="add-circle-outline" size={20} color="#fff" />
-          <Text style={styles.botaoTexto}>Adicionar primeiro medicamento</Text>
+        <TouchableOpacity onPress={onAdicionar} activeOpacity={0.85} style={styles.botaoWrapper}>
+          <LinearGradient
+            colors={["#52C98A", "#2D6A4F", "#1A4D38"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.botao}
+          >
+            <Ionicons name="add-circle-outline" size={20} color="#fff" />
+            <Text style={styles.botaoTexto}>Adicionar primeiro medicamento</Text>
+          </LinearGradient>
         </TouchableOpacity>
       )}
     </View>
@@ -76,12 +85,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 32,
     gap: 20,
-  },
-  iconeContainer: {
-    marginBottom: 4,
   },
   iconeGradient: {
     width: 120,
@@ -89,18 +95,21 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#2D6A4F",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 8,
   },
   iconeInner: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.5)",
   },
-  textos: {
-    alignItems: "center",
-    gap: 8,
-  },
+  textos: { alignItems: "center", gap: 8 },
   titulo: {
     fontSize: 22,
     fontFamily: "Poppins_700Bold",
@@ -113,50 +122,45 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     maxWidth: 280,
   },
-  featuresList: {
-    width: "100%",
-    borderRadius: 16,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  featureItem: {
+  features: { width: "100%", gap: 8 },
+  featureCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   featureIcone: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
   },
   featureTexto: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Poppins_400Regular",
     flex: 1,
-    lineHeight: 20,
+    lineHeight: 19,
+  },
+  botaoWrapper: {
+    width: "100%",
+    borderRadius: 18,
+    overflow: "hidden",
+    shadowColor: "#2D6A4F",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
   },
   botao: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 28,
-    paddingVertical: 15,
-    borderRadius: 16,
-    shadowColor: "#2D6A4F",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-    width: "100%",
     justifyContent: "center",
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 18,
   },
   botaoTexto: {
     color: "#fff",
