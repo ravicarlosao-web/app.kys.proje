@@ -34,6 +34,8 @@ interface MedicamentosContextType {
   editarMedicamento: (id: string, dados: Omit<Medicamento, "id" | "criadoEm" | "notificationIds">) => Promise<void>;
   eliminarMedicamento: (id: string) => Promise<void>;
   marcarComoTomado: (medicamentoId: string, horario: string) => Promise<void>;
+  togglePausa: (id: string) => Promise<void>;
+  atualizarStock: (id: string, delta: number) => Promise<void>;
   recarregar: () => Promise<void>;
   reagendarNotificacoes: () => Promise<number>;
   temPermissaoNotificacoes: boolean;
@@ -181,6 +183,41 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
     );
   }, [medicamentos]);
 
+  // ─── Pausar / Retomar ─────────────────────────────────────────────────────
+  const togglePausa = useCallback(async (id: string) => {
+    const med = medicamentos.find((m) => m.id === id);
+    if (!med) return;
+    const novoAtivo = !med.ativo;
+    if (!novoAtivo) {
+      // Pausar: cancelar notificações
+      if (med.notificationIds?.length) await cancelNotifications(med.notificationIds);
+      await updateMedicamento(id, { ativo: false, notificationIds: [] });
+      setMedicamentos((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, ativo: false, notificationIds: [] } : m))
+      );
+    } else {
+      // Retomar: reagendar notificações
+      const medAtivo = { ...med, ativo: true };
+      const notifIds = await scheduleNotification(medAtivo);
+      await updateMedicamento(id, { ativo: true, notificationIds: notifIds });
+      setMedicamentos((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, ativo: true, notificationIds: notifIds } : m))
+      );
+    }
+  }, [medicamentos]);
+
+  // ─── Actualizar stock (delta +/-) ─────────────────────────────────────────
+  const atualizarStock = useCallback(async (id: string, delta: number) => {
+    const med = medicamentos.find((m) => m.id === id);
+    if (!med || med.estoque === null) return;
+    const novoStock = Math.max(0, med.estoque + delta);
+    await updateMedicamento(id, { estoque: novoStock });
+    setMedicamentos((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, estoque: novoStock } : m))
+    );
+    if (novoStock <= 5) await notificarStockBaixo({ ...med, estoque: novoStock });
+  }, [medicamentos]);
+
   // ─── Eliminar medicamento ──────────────────────────────────────────────────
   const eliminarMedicamento = useCallback(async (id: string) => {
     const med = medicamentos.find((m) => m.id === id);
@@ -236,6 +273,8 @@ export function MedicamentosProvider({ children }: { children: React.ReactNode }
         editarMedicamento,
         eliminarMedicamento,
         marcarComoTomado,
+        togglePausa,
+        atualizarStock,
         recarregar,
         reagendarNotificacoes,
         temPermissaoNotificacoes,
