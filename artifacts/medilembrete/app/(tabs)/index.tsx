@@ -27,6 +27,7 @@ import { useColors } from "@/hooks/useColors";
 import { useMedicamentos } from "@/context/MedicamentosContext";
 import MedicamentoCard from "@/components/MedicamentoCard";
 import EmptyState from "@/components/EmptyState";
+import ProximaDose from "@/components/ProximaDose";
 import { Medicamento } from "@/types";
 
 function getSaudacao(): string {
@@ -198,6 +199,14 @@ export default function HomeScreen() {
             </View>
           )}
         </View>
+
+        {/* Widget de próxima dose com contagem decrescente */}
+        <ProximaDose
+          medicamentos={medicamentos}
+          dosesTomadasHoje={dosesTomadasHoje}
+          totalDosesHoje={totalDosesHoje}
+          dosesTomadas={dosesTomadas}
+        />
       </View>
 
       {/* Lista sobre fundo glass claro */}
